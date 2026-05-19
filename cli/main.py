@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from .analyze import load_prompt  # noqa: E402
+from .analyze import is_automated_sync_pr, load_prompt  # noqa: E402
 from .batch import (  # noqa: E402
     generate_pr_list_from_date_range,
     load_pr_urls_from_file,
@@ -128,6 +128,24 @@ def analyze_pr_to_dict(
         )
 
     title = (meta.get("title") or "").strip()
+    author_login = (meta.get("user") or {}).get("login")
+    body = meta.get("body") or ""
+
+    # Short-circuit automated cross-repo file sync PRs: they are mechanical
+    # mirrors of upstream files, so there is no implementation effort to score.
+    if is_automated_sync_pr(title, author_login, body):
+        return {
+            "score": 1,
+            "explanation": "Automated cross-repo file sync; no implementation work.",
+            "provider": "heuristic",
+            "model": "sync-shortcircuit",
+            "tokens": None,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "repo": f"{owner}/{repo}",
+            "pr": pr,
+            "url": pr_url,
+            "title": title,
+        }
 
     # Process diff
     truncated_diff, stats, selected_files = process_diff(
@@ -928,9 +946,7 @@ def label_pr(
                 explanation = output["explanation"]
                 if "\n" in explanation:
                     delimiter = "EOF"
-                    f.write(
-                        f"explanation<<{delimiter}\n{explanation}\n{delimiter}\n"
-                    )
+                    f.write(f"explanation<<{delimiter}\n{explanation}\n{delimiter}\n")
                 else:
                     f.write(f"explanation={explanation}\n")
 

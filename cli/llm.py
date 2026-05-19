@@ -1,7 +1,7 @@
 """LLM provider adapter with JSON schema validation and retries."""
 
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from openai import OpenAI
 
@@ -22,7 +22,7 @@ class OpenAIProvider(LLMProvider):
         api_key: str,
         model: str = DEFAULT_MODEL,
         timeout: float = DEFAULT_TIMEOUT,
-        base_url: str | None = None,
+        base_url: Optional[str] = None,
     ):
         """
         Initialize OpenAI provider.
