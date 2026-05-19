@@ -110,6 +110,7 @@ Use these as approximate bands; choose an integer within them:
 - Tiny, localized changes (single guard clause, simple config key rename, a single decorator).
 - Very small migrations (add/drop a column) without complex logic or tests.
 - Simple test changes or minimal env/config tweaks.
+- Automated bulk file syncs (e.g. titles containing "synced file(s)", "[skip-ci]", or PRs opened by repo-mirror/sync bots) and generated-lockfile-only changes (e.g. `*.lock.yml`, `*.lock.yaml`, `package-lock.json`, `pnpm-lock.yaml` produced by tooling) — score 1 regardless of line count, since no human authored the contents.
 
 3–4: Small but non-trivial
 - Localized to a small area of the codebase.

@@ -31,6 +31,16 @@ def test_filter_file():
     assert filter_file(".cursor/rules/style.mdc") is False
 
 
+def test_filter_file_lock_yaml():
+    """Generated *.lock.yml / *.lock.yaml files should be filtered out."""
+    # gh-aw and similar tools produce these as compiled lockfiles
+    assert filter_file(".github/workflows/ks-drift-detector.lock.yml") is False
+    assert filter_file(".github/workflows/some.lock.yaml") is False
+    # But regular .yml / .yaml files should still pass through
+    assert filter_file(".github/workflows/build.yml") is True
+    assert filter_file("config/app.yaml") is True
+
+
 def test_parse_diff_sections():
     """Test diff parsing."""
     diff = """diff --git a/file.py b/file.py
