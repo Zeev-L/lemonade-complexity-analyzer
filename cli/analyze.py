@@ -1,6 +1,7 @@
 """Core PR analysis logic extracted from main.py."""
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -12,6 +13,50 @@ from .io_safety import read_text_file
 from .llm import OpenAIProvider
 from .preprocess import make_prompt_input, process_diff
 from .utils import parse_pr_url
+
+_SYNC_TITLE_RE = re.compile(
+    r"synced (?:local )?file\(s\)",
+    re.IGNORECASE,
+)
+_SYNC_BODY_RE = re.compile(
+    r"(?:repo-file-sync-action|created automatically by|This PR was created automatically)",
+    re.IGNORECASE,
+)
+_SYNC_BOT_LOGINS = frozenset(
+    {
+        "github-actions[bot]",
+        "github-actions",
+        "repo-file-sync-action",
+        "repo-file-sync-action[bot]",
+        "dependabot[bot]",
+        "renovate[bot]",
+    }
+)
+
+
+def is_automated_sync_pr(
+    title: str,
+    author_login: Optional[str],
+    body: Optional[str] = None,
+) -> bool:
+    """
+    Detect automated cross-repo file sync PRs.
+
+    Requires the title to look like a sync/mirror PR (e.g. "synced file(s)")
+    AND a corroborating bot signal — either a known bot login OR a body
+    signature from a sync action (since sync workflows often commit under a
+    human PAT, making author_login alone unreliable).
+    """
+    if not title or not _SYNC_TITLE_RE.search(title):
+        return False
+
+    if author_login and author_login.lower() in {login.lower() for login in _SYNC_BOT_LOGINS}:
+        return True
+
+    if body and _SYNC_BODY_RE.search(body):
+        return True
+
+    return False
 
 
 def load_prompt(prompt_file: Optional[Path] = None) -> str:
@@ -100,6 +145,24 @@ def analyze_single_pr(
         )
 
     title = (meta.get("title") or "").strip()
+    author_login = (meta.get("user") or {}).get("login")
+    body = meta.get("body") or ""
+
+    # Short-circuit automated cross-repo file sync PRs: they are mechanical
+    # mirrors of upstream files, so there is no implementation effort to score.
+    if is_automated_sync_pr(title, author_login, body):
+        return {
+            "score": 1,
+            "explanation": "Automated cross-repo file sync; no implementation work.",
+            "provider": "heuristic",
+            "model": "sync-shortcircuit",
+            "tokens": None,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "repo": f"{owner}/{repo}",
+            "pr": pr,
+            "url": pr_url,
+            "title": title,
+        }
 
     # Process diff
     truncated_diff, stats, selected_files = process_diff(
