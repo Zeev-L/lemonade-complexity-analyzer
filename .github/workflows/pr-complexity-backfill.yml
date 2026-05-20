@@ -1,0 +1,63 @@
+name: PR Complexity Backfill
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Number of days to look back (including today). Default 2 covers yesterday + today.'
+        required: false
+        default: '2'
+
+jobs:
+  backfill:
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Compute date range
+        id: dates
+        run: |
+          DAYS="${{ inputs.days || '2' }}"
+          UNTIL="$(date -u +%Y-%m-%d)"
+          SINCE="$(date -u -d "$((DAYS - 1)) days ago" +%Y-%m-%d)"
+          echo "since=$SINCE" >> "$GITHUB_OUTPUT"
+          echo "until=$UNTIL" >> "$GITHUB_OUTPUT"
+          echo "Backfilling $SINCE..$UNTIL"
+
+      - name: Backfill open PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          complexity-cli batch-analyze \
+            --org lemonade-hq \
+            --state open \
+            --since ${{ steps.dates.outputs.since }} \
+            --until ${{ steps.dates.outputs.until }} \
+            --label \
+            --workers 5
+
+      - name: Backfill closed PRs
+        env:
+          GITHUB_TOKEN: ${{ secrets.ORG_GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          complexity-cli batch-analyze \
+            --org lemonade-hq \
+            --state closed \
+            --since ${{ steps.dates.outputs.since }} \
+            --until ${{ steps.dates.outputs.until }} \
+            --label \
+            --workers 5
