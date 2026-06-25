@@ -63,6 +63,16 @@ cd complexity-cli
 pip install -e .
 ```
 
+### With Claude Code
+
+Point Claude Code at the repo and say *"read the README and set this up."*
+
+- **Claude Code can do:** `pip install -e .`, run `analyze-pr`/`batch-analyze`,
+  and wire the included GitHub Action (`.github/workflows/pr-complexity.yml`).
+- **Needs you, a human:** an **`OPENAI_API_KEY`** (and optionally a `GH_TOKEN`
+  for private repos / higher rate limits) — secrets only you can create, set as
+  env vars locally or as repo Action secrets.
+
 ## Usage
 
 ### Commands
